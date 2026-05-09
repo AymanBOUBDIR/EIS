@@ -1,0 +1,46 @@
+# ===========================
+# Java / Spring Boot
+# ===========================
+eis-backend/target/
+eis-backend/.mvn/wrapper/maven-wrapper.jar
+eis-backend/*.class
+eis-backend/*.jar
+eis-backend/*.war
+eis-backend/.settings/
+eis-backend/.classpath
+eis-backend/.project
+eis-backend/.idea/
+eis-backend/*.iml
+eis-backend/HELP.md
+
+# ===========================
+# Node / React Frontend
+# ===========================
+eis-frontend/node_modules/
+eis-frontend/build/
+eis-frontend/.pnp
+eis-frontend/.pnp.js
+eis-frontend/coverage/
+eis-frontend/.env.local
+eis-frontend/.env.development.local
+eis-frontend/.env.test.local
+eis-frontend/.env.production.local
+eis-frontend/npm-debug.log*
+eis-frontend/yarn-debug.log*
+eis-frontend/yarn-error.log*
+
+# ===========================
+# Secrets / Environment
+# ===========================
+.env
+*.env
+application-secrets.properties
+
+# ===========================
+# OS / IDE
+# ===========================
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*.swo
