@@ -31,6 +31,52 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build:
+      context: ./eis-backend
+      dockerfile: Dockerfile
+    container_name: eis-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/eis_db
+      - SPRING_DATASOURCE_USERNAME=eis_user
+      - SPRING_DATASOURCE_PASSWORD=eis_password
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - NVIDIA_API_KEY=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
+      - ML_SERVICE_URL=http://ml-service:5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ml-service:
+        condition: service_healthy
+
+  ml-service:
+    build:
+      context: ./python-ml-service
+      dockerfile: Dockerfile
+    container_name: eis-ml-service
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./eis-frontend
+      dockerfile: Dockerfile
+    container_name: eis-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:

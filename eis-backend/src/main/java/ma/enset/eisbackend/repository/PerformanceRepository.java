@@ -19,4 +19,11 @@ public interface PerformanceRepository extends JpaRepository<Performance, Long> 
 
     @Query("SELECT AVG(p.rating) FROM Performance p WHERE p.employee.department.id = :deptId")
     Double getAverageDepartmentRating(@Param("deptId") Long deptId);
+
+    // Dashboard queries
+    @Query("SELECT AVG(p.rating) FROM Performance p")
+    Double getOverallAverageRating();
+
+    @Query("SELECT AVG(p.rating) FROM Performance p WHERE MONTH(p.reviewDate) = :month AND YEAR(p.reviewDate) = :year")
+    Double getAverageRatingByMonth(@Param("month") int month, @Param("year") int year);
 }

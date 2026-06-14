@@ -9,10 +9,12 @@ import ma.enset.eisbackend.entity.Performance;
 import ma.enset.eisbackend.repository.DepartmentRepository;
 import ma.enset.eisbackend.repository.EmployeeRepository;
 import ma.enset.eisbackend.repository.AttendanceRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 
@@ -35,7 +37,12 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final AttendanceRepository attendanceRepository;
+    private final RestTemplate restTemplate;
 
+    @Value("${ml.service.url:http://localhost:5000}")
+    private String mlServiceUrl;
+
+    @Cacheable(value = "employees")
     public List<EmployeeDTO> getAllEmployees() {
         log.info("Fetching all employees");
         return employeeRepository.findByIsActiveTrue().stream()
@@ -43,6 +50,7 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "employee", key = "#id")
     public EmployeeDTO getEmployeeById(Long id) {
         log.info("Fetching employee with ID: {}", id);
         return employeeRepository.findById(id)
@@ -105,6 +113,7 @@ public class EmployeeService {
         employeeRepository.save(employee);
     }
 
+    @Cacheable(value = "employees", key = "'high-earners-' + #minSalary")
     public List<EmployeeDTO> getHighEarners(BigDecimal minSalary) {
         log.info("Fetching high earners with minimum salary: {}", minSalary);
         return employeeRepository.findHighEarners(minSalary).stream()
@@ -112,6 +121,7 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "employees", key = "'at-risk-' + #threshold")
     public List<EmployeeDTO> getAttritionRisk(Double threshold) {
         log.info("Fetching employees with attrition risk >= {}", threshold);
         return employeeRepository.findAtRiskEmployees(threshold).stream()
@@ -119,6 +129,7 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
+    @Cacheable(value = "employees", key = "'dept-' + #deptId")
     public List<EmployeeDTO> getByDepartment(Long deptId) {
         log.info("Fetching employees by department: {}", deptId);
         return employeeRepository.findByDepartmentId(deptId).stream()
@@ -179,8 +190,9 @@ public class EmployeeService {
 
         // 2. Performance Factor
         List<Performance> performances = employee.getPerformances();
+        double avgRating = 5.0;
         if (performances != null && !performances.isEmpty()) {
-            double avgRating = performances.stream()
+            avgRating = performances.stream()
                     .mapToDouble(Performance::getRating)
                     .average()
                     .orElse(5.0);
@@ -189,11 +201,12 @@ public class EmployeeService {
         }
 
         // 3. Salary Factor
+        double salaryRatio = 1.0;
         if (employee.getDepartment() != null && employee.getSalary() != null) {
             try {
                 Double avgSalary = employeeRepository.getAverageSalaryByDepartmentId(employee.getDepartment().getId());
                 if (avgSalary != null && avgSalary > 0) {
-                    double salaryRatio = employee.getSalary().doubleValue() / avgSalary;
+                    salaryRatio = employee.getSalary().doubleValue() / avgSalary;
                     if (salaryRatio < 0.7) salaryRisk = 30.0;
                     else if (salaryRatio < 0.85) salaryRisk = 15.0;
                 }
@@ -203,6 +216,14 @@ public class EmployeeService {
         }
 
         double totalRisk = Math.min(attendanceRisk + performanceRisk + salaryRisk, 100.0);
+
+        MlPredictionResponse mlResponse = callMlService(attendanceRate, avgRating, salaryRatio);
+        if (mlResponse != null) {
+            log.debug("ML predicted attrition risk for employee ID {}: {}% (previously calculated rule-based risk: {}%)", 
+                employee.getId(), mlResponse.getAttrition_probability(), totalRisk);
+            totalRisk = mlResponse.getAttrition_probability();
+        }
+
         employee.setAttritionRisk(totalRisk);
 
         return EmployeeDTO.builder()
@@ -222,5 +243,35 @@ public class EmployeeService {
                 .isActive(employee.getIsActive())
                 .photoUrl(employee.getPhotoUrl())
                 .build();
+    }
+
+    private MlPredictionResponse callMlService(double attendanceRate, double avgRating, double salaryRatio) {
+        try {
+            String url = mlServiceUrl + "/predict";
+            MlPredictionRequest request = new MlPredictionRequest(attendanceRate, avgRating, salaryRatio);
+            return restTemplate.postForObject(url, request, MlPredictionResponse.class);
+        } catch (Exception e) {
+            log.warn("ML service call failed, falling back to rule-based risk calculation. Error: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class MlPredictionRequest {
+        private double attendance_rate;
+        private double performance_rating;
+        private double salary_ratio;
+    }
+
+    @lombok.Data
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class MlPredictionResponse {
+        private double attrition_probability;
+        private String attrition_risk_class;
+        private String recommendation;
     }
 }

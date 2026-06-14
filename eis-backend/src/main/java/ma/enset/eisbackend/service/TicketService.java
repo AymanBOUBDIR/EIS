@@ -7,6 +7,7 @@ import ma.enset.eisbackend.entity.Employee;
 import ma.enset.eisbackend.entity.Ticket;
 import ma.enset.eisbackend.repository.TicketRepository;
 import ma.enset.eisbackend.repository.EmployeeRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final EmployeeRepository employeeRepository;
     private final EmailService emailService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public List<TicketDTO> getAllTickets() {
         return ticketRepository.findAll().stream().map(this::toDTO).collect(Collectors.toList());
@@ -50,13 +52,21 @@ public class TicketService {
 
         log.warn("Created new OPEN ticket for employee ID: {} due to low attendance", employee.getId());
         Ticket savedTicket = ticketRepository.save(ticket);
-        
+        TicketDTO dtoResult = toDTO(savedTicket);
+
         // Send email notification safely
         if (employee.getEmail() != null) {
             emailService.sendTicketNotification(employee.getEmail(), employee.getName(), savedTicket.getDescription());
         }
+
+        // Broadcast event via WebSocket
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets", dtoResult);
+        } catch (Exception e) {
+            log.error("Failed to broadcast ticket event via WebSocket: {}", e.getMessage());
+        }
         
-        return toDTO(savedTicket);
+        return dtoResult;
     }
 
     public TicketDTO createTicket(TicketDTO dto) {
@@ -88,13 +98,21 @@ public class TicketService {
         }
 
         Ticket savedTicket = ticketRepository.save(ticket);
+        TicketDTO dtoResult = toDTO(savedTicket);
         
         // Send email notification safely
         if (employee.getEmail() != null) {
             emailService.sendTicketNotification(employee.getEmail(), employee.getName(), savedTicket.getDescription());
         }
 
-        return toDTO(savedTicket);
+        // Broadcast event via WebSocket
+        try {
+            messagingTemplate.convertAndSend("/topic/tickets", dtoResult);
+        } catch (Exception e) {
+            log.error("Failed to broadcast ticket event via WebSocket: {}", e.getMessage());
+        }
+
+        return dtoResult;
     }
 
     public TicketDTO updateTicket(Long id, TicketDTO dto) {

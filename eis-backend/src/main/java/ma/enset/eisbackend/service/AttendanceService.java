@@ -10,6 +10,7 @@ import ma.enset.eisbackend.repository.AttendanceRepository;
 import ma.enset.eisbackend.repository.EmployeeRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +26,7 @@ public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public List<AttendanceDTO> getEmployeeAttendance(Long empId) {
         log.info("Fetching attendance for employee: {}", empId);
@@ -60,7 +62,15 @@ public class AttendanceService {
                 .build();
 
         Attendance saved = attendanceRepository.save(attendance);
-        return toDTO(saved);
+        AttendanceDTO savedDto = toDTO(saved);
+        
+        try {
+            messagingTemplate.convertAndSend("/topic/attendance", savedDto);
+        } catch (Exception e) {
+            log.error("Failed to broadcast attendance check-in via WebSocket: {}", e.getMessage());
+        }
+
+        return savedDto;
     }
 
     public double getAttendanceRate(Long empId, int days) {
