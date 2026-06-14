@@ -45,7 +45,7 @@ public class TicketController {
     }
 
     @PostMapping("/run-agent")
-    public ResponseEntity<List<TicketDTO>> runAgentCheck() {
-        return ResponseEntity.ok(agentScheduler.runEvaluation());
+    public ResponseEntity<List<TicketDTO>> runAgentCheck(@RequestParam(required = false) Long employeeId) {
+        return ResponseEntity.ok(agentScheduler.runEvaluation(employeeId));
     }
 }

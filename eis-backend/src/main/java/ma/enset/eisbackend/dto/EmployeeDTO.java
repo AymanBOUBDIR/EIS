@@ -23,6 +23,9 @@ public class EmployeeDTO {
     private String deptName;
     private Long managerId;
     private Double attritionRisk;
+    private Double attendanceRiskContribution;
+    private Double performanceRiskContribution;
+    private Double salaryRiskContribution;
     private Boolean isActive;
     private String photoUrl;
 }

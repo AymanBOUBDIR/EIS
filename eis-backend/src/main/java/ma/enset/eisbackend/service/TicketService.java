@@ -22,6 +22,7 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmailService emailService;
 
     public List<TicketDTO> getAllTickets() {
         return ticketRepository.findAll().stream().map(this::toDTO).collect(Collectors.toList());
@@ -33,7 +34,7 @@ public class TicketService {
 
     public TicketDTO createFollowUpTicket(Employee employee, double attendanceRate) {
         // Prevent duplicate OPEN tickets for the same employee
-        if (ticketRepository.findOpenTicketByEmployeeId(employee.getId()).isPresent()) {
+        if (ticketRepository.findByEmployeeIdAndStatus(employee.getId(), Ticket.TicketStatus.OPEN).isPresent()) {
             log.info("An OPEN ticket already exists for employee ID: {}", employee.getId());
             return null;
         }
@@ -48,7 +49,14 @@ public class TicketService {
                 .build();
 
         log.warn("Created new OPEN ticket for employee ID: {} due to low attendance", employee.getId());
-        return toDTO(ticketRepository.save(ticket));
+        Ticket savedTicket = ticketRepository.save(ticket);
+        
+        // Send email notification safely
+        if (employee.getEmail() != null) {
+            emailService.sendTicketNotification(employee.getEmail(), employee.getName(), savedTicket.getDescription());
+        }
+        
+        return toDTO(savedTicket);
     }
 
     public TicketDTO createTicket(TicketDTO dto) {
@@ -79,7 +87,14 @@ public class TicketService {
             ticket.setResolvedAt(LocalDateTime.now());
         }
 
-        return toDTO(ticketRepository.save(ticket));
+        Ticket savedTicket = ticketRepository.save(ticket);
+        
+        // Send email notification safely
+        if (employee.getEmail() != null) {
+            emailService.sendTicketNotification(employee.getEmail(), employee.getName(), savedTicket.getDescription());
+        }
+
+        return toDTO(savedTicket);
     }
 
     public TicketDTO updateTicket(Long id, TicketDTO dto) {

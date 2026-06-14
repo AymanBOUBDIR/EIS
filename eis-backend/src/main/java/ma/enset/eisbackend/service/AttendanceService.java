@@ -44,13 +44,17 @@ public class AttendanceService {
     public AttendanceDTO recordAttendance(AttendanceDTO dto) {
         log.info("Recording attendance for employee: {}", dto.getEmpId());
 
+        if (attendanceRepository.existsByEmployeeIdAndDate(dto.getEmpId(), dto.getDate())) {
+            throw new RuntimeException("Attendance has already been recorded for this employee on this date.");
+        }
+
         Employee employee = employeeRepository.findById(dto.getEmpId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         Attendance attendance = Attendance.builder()
                 .employee(employee)
                 .date(dto.getDate())
-                .status(AttendanceStatus.valueOf(dto.getStatus()))
+                .status(AttendanceStatus.valueOf(dto.getStatus().toUpperCase()))
                 .hoursWorked(dto.getHoursWorked())
                 .remarks(dto.getRemarks())
                 .build();
@@ -66,6 +70,12 @@ public class AttendanceService {
 
         int presentDays = attendanceRepository.countPresentDays(empId, startDate, endDate);
         return (presentDays * 100.0) / days;
+    }
+
+    public AttendanceDTO getTodayAttendance(Long empId) {
+        log.info("Checking today's attendance for employee: {}", empId);
+        java.util.Optional<Attendance> attendance = attendanceRepository.findByEmployeeIdAndDate(empId, LocalDate.now());
+        return attendance.map(this::toDTO).orElse(null);
     }
 
     private AttendanceDTO toDTO(Attendance attendance) {

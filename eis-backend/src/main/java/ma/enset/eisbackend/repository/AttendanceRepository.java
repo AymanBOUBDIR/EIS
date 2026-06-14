@@ -22,4 +22,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     @Query("SELECT COUNT(a) FROM Attendance a WHERE a.employee.id = :empId AND a.status = 'PRESENT' AND a.date BETWEEN :startDate AND :endDate")
     int countPresentDays(@Param("empId") Long empId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    boolean existsByEmployeeIdAndDate(Long employeeId, LocalDate date);
+
+    java.util.Optional<Attendance> findByEmployeeIdAndDate(Long employeeId, LocalDate date);
 }

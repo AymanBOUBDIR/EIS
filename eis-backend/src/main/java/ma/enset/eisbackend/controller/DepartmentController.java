@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/departments")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class DepartmentController {
 
     private final DepartmentService departmentService;
@@ -41,5 +41,11 @@ public class DepartmentController {
     public ResponseEntity<Void> deleteDepartment(@PathVariable Long id) {
         departmentService.deleteDepartment(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/apply-raise")
+    public ResponseEntity<Void> applyRaise(@PathVariable Long id, @RequestParam double percentage) {
+        departmentService.applyRaise(id, percentage);
+        return ResponseEntity.ok().build();
     }
 }

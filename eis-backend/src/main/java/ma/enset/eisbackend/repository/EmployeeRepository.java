@@ -27,4 +27,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     @Query("SELECT COUNT(e) FROM Employee e WHERE e.department.id = :deptId")
     int countByDepartmentId(@Param("deptId") Long deptId);
+
+    @Query("SELECT AVG(e.salary) FROM Employee e WHERE e.department.id = :deptId AND e.isActive = true")
+    Double getAverageSalaryByDepartmentId(@Param("deptId") Long deptId);
 }

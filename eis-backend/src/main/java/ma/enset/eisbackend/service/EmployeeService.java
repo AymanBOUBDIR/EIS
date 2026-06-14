@@ -5,13 +5,16 @@ import lombok.extern.slf4j.Slf4j;
 import ma.enset.eisbackend.dto.EmployeeDTO;
 import ma.enset.eisbackend.entity.Department;
 import ma.enset.eisbackend.entity.Employee;
+import ma.enset.eisbackend.entity.Performance;
 import ma.enset.eisbackend.repository.DepartmentRepository;
 import ma.enset.eisbackend.repository.EmployeeRepository;
+import ma.enset.eisbackend.repository.AttendanceRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import java.time.LocalDate;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -31,6 +34,7 @@ public class EmployeeService {
 
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
+    private final AttendanceRepository attendanceRepository;
 
     public List<EmployeeDTO> getAllEmployees() {
         log.info("Fetching all employees");
@@ -155,6 +159,52 @@ public class EmployeeService {
     }
 
     private EmployeeDTO toDTO(Employee employee) {
+        double attendanceRisk = 0.0;
+        double performanceRisk = 0.0;
+        double salaryRisk = 0.0;
+
+        // 1. Attendance Factor
+        double attendanceRate = 100.0;
+        try {
+            LocalDate endDate = LocalDate.now();
+            LocalDate startDate = endDate.minusDays(30);
+            int presentDays = attendanceRepository.countPresentDays(employee.getId(), startDate, endDate);
+            attendanceRate = (presentDays * 100.0) / 30.0;
+        } catch (Exception e) {
+            log.error("Error calculating attendance rate for employee risk: ", e);
+        }
+        if (attendanceRate < 50.0) attendanceRisk = 40.0;
+        else if (attendanceRate < 75.0) attendanceRisk = 25.0;
+        else if (attendanceRate < 90.0) attendanceRisk = 10.0;
+
+        // 2. Performance Factor
+        List<Performance> performances = employee.getPerformances();
+        if (performances != null && !performances.isEmpty()) {
+            double avgRating = performances.stream()
+                    .mapToDouble(Performance::getRating)
+                    .average()
+                    .orElse(5.0);
+            if (avgRating < 2.5) performanceRisk = 30.0;
+            else if (avgRating < 3.5) performanceRisk = 15.0;
+        }
+
+        // 3. Salary Factor
+        if (employee.getDepartment() != null && employee.getSalary() != null) {
+            try {
+                Double avgSalary = employeeRepository.getAverageSalaryByDepartmentId(employee.getDepartment().getId());
+                if (avgSalary != null && avgSalary > 0) {
+                    double salaryRatio = employee.getSalary().doubleValue() / avgSalary;
+                    if (salaryRatio < 0.7) salaryRisk = 30.0;
+                    else if (salaryRatio < 0.85) salaryRisk = 15.0;
+                }
+            } catch (Exception e) {
+                log.error("Error calculating salary ratio for employee risk: ", e);
+            }
+        }
+
+        double totalRisk = Math.min(attendanceRisk + performanceRisk + salaryRisk, 100.0);
+        employee.setAttritionRisk(totalRisk);
+
         return EmployeeDTO.builder()
                 .id(employee.getId())
                 .name(employee.getName())
@@ -162,10 +212,13 @@ public class EmployeeService {
                 .phone(employee.getPhone())
                 .hireDate(employee.getHireDate())
                 .salary(employee.getSalary())
-                .deptId(employee.getDepartment().getId())
-                .deptName(employee.getDepartment().getDeptName())
+                .deptId(employee.getDepartment() != null ? employee.getDepartment().getId() : null)
+                .deptName(employee.getDepartment() != null ? employee.getDepartment().getDeptName() : null)
                 .managerId(employee.getManager() != null ? employee.getManager().getId() : null)
-                .attritionRisk(employee.getAttritionRisk())
+                .attritionRisk(totalRisk)
+                .attendanceRiskContribution(attendanceRisk)
+                .performanceRiskContribution(performanceRisk)
+                .salaryRiskContribution(salaryRisk)
                 .isActive(employee.getIsActive())
                 .photoUrl(employee.getPhotoUrl())
                 .build();

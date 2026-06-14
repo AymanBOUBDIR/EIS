@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/attendance")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
@@ -41,5 +41,10 @@ public class AttendanceController {
             @PathVariable Long empId,
             @RequestParam(defaultValue = "30") int days) {
         return ResponseEntity.ok(attendanceService.getAttendanceRate(empId, days));
+    }
+
+    @GetMapping("/{empId}/today")
+    public ResponseEntity<AttendanceDTO> getTodayAttendance(@PathVariable Long empId) {
+        return ResponseEntity.ok(attendanceService.getTodayAttendance(empId));
     }
 }

@@ -16,4 +16,5 @@ public class DepartmentDTO {
     private String deptName;
     private String description;
     private BigDecimal budget;
+    private Integer employeeCount;
 }

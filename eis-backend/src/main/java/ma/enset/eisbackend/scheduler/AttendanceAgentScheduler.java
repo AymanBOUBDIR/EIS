@@ -23,19 +23,36 @@ public class AttendanceAgentScheduler {
 
     // Manual trigger method (replaces @Scheduled)
     public List<TicketDTO> runEvaluation() {
+        return runEvaluation(null);
+    }
+
+    public List<TicketDTO> runEvaluation(Long employeeId) {
         log.info("🤖 Agent: Starting manual attendance evaluation...");
-        
-        List<Employee> activeEmployees = employeeRepository.findByIsActiveTrue();
         List<TicketDTO> newTickets = new ArrayList<>();
 
-        for (Employee emp : activeEmployees) {
-            // Calculate attendance rate for the last 30 days
-            double rate = attendanceService.getAttendanceRate(emp.getId(), 30);
-            
-            if (rate < 50.0) {
-                TicketDTO ticket = ticketService.createFollowUpTicket(emp, rate);
-                if (ticket != null) {
-                    newTickets.add(ticket);
+        if (employeeId != null) {
+            Employee emp = employeeRepository.findById(employeeId).orElse(null);
+            if (emp != null && Boolean.TRUE.equals(emp.getIsActive())) {
+                double rate = attendanceService.getAttendanceRate(emp.getId(), 30);
+                log.info("🤖 Agent: Checking attendance rate for employee {} (ID {}): {}%", emp.getName(), emp.getId(), rate);
+                if (rate < 50.0) {
+                    TicketDTO ticket = ticketService.createFollowUpTicket(emp, rate);
+                    if (ticket != null) {
+                        newTickets.add(ticket);
+                    }
+                }
+            }
+        } else {
+            List<Employee> activeEmployees = employeeRepository.findByIsActiveTrue();
+            for (Employee emp : activeEmployees) {
+                // Calculate attendance rate for the last 30 days
+                double rate = attendanceService.getAttendanceRate(emp.getId(), 30);
+                
+                if (rate < 50.0) {
+                    TicketDTO ticket = ticketService.createFollowUpTicket(emp, rate);
+                    if (ticket != null) {
+                        newTickets.add(ticket);
+                    }
                 }
             }
         }
