@@ -35,6 +35,9 @@ eis-frontend/yarn-error.log*
 .env
 *.env
 application-secrets.properties
+eis-backend/uploads/
+run-backend.bat
+run-backend.sh
 
 # ===========================
 # OS / IDE

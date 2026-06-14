@@ -11,9 +11,16 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -69,9 +76,11 @@ public class EmployeeService {
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
         if (dto.getName() != null) employee.setName(dto.getName());
+        if (dto.getEmail() != null) employee.setEmail(dto.getEmail());
         if (dto.getPhone() != null) employee.setPhone(dto.getPhone());
         if (dto.getSalary() != null) employee.setSalary(dto.getSalary());
         if (dto.getHireDate() != null) employee.setHireDate(dto.getHireDate());
+        if (dto.getPhotoUrl() != null) employee.setPhotoUrl(dto.getPhotoUrl());
 
         if (dto.getDeptId() != null) {
             Department dept = departmentRepository.findById(dto.getDeptId())
@@ -113,6 +122,38 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
+    @CacheEvict(value = {"employees", "employee"}, allEntries = true)
+    public EmployeeDTO uploadPhoto(Long id, MultipartFile file) {
+        log.info("Uploading photo for employee: {}", id);
+        Employee employee = employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        try {
+            // Create uploads directory if it doesn't exist
+            Path uploadDir = Paths.get("uploads/employee-photos");
+            Files.createDirectories(uploadDir);
+
+            // Generate unique filename
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".")
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : ".jpg";
+            String filename = "emp_" + id + "_" + UUID.randomUUID().toString().substring(0, 8) + extension;
+
+            // Save file
+            Path filePath = uploadDir.resolve(filename);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            // Update employee photo URL
+            String photoUrl = "/api/v1/uploads/employee-photos/" + filename;
+            employee.setPhotoUrl(photoUrl);
+            Employee updated = employeeRepository.save(employee);
+            return toDTO(updated);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to store photo: " + e.getMessage());
+        }
+    }
+
     private EmployeeDTO toDTO(Employee employee) {
         return EmployeeDTO.builder()
                 .id(employee.getId())
@@ -126,6 +167,7 @@ public class EmployeeService {
                 .managerId(employee.getManager() != null ? employee.getManager().getId() : null)
                 .attritionRisk(employee.getAttritionRisk())
                 .isActive(employee.getIsActive())
+                .photoUrl(employee.getPhotoUrl())
                 .build();
     }
 }

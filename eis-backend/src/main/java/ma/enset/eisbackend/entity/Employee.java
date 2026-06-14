@@ -58,6 +58,10 @@ public class Employee extends BaseEntity {
     @Column(name = "attrition_risk")
     private Double attritionRisk;
 
+    @Builder.Default
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
 }

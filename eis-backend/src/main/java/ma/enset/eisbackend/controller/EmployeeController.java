@@ -60,4 +60,11 @@ public class EmployeeController {
             @RequestParam(defaultValue = "60") Double threshold) {
         return ResponseEntity.ok(employeeService.getAttritionRisk(threshold));
     }
+
+    @PostMapping("/{id}/photo")
+    public ResponseEntity<EmployeeDTO> uploadPhoto(
+            @PathVariable Long id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(employeeService.uploadPhoto(id, file));
+    }
 }

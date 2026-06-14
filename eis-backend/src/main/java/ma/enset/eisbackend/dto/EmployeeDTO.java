@@ -24,4 +24,5 @@ public class EmployeeDTO {
     private Long managerId;
     private Double attritionRisk;
     private Boolean isActive;
+    private String photoUrl;
 }
