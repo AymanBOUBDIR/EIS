@@ -129,6 +129,17 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    @CacheEvict(value = {"employees", "employee"}, allEntries = true)
+    public void updateEmployeeAttritionRisk(Long employeeId) {
+        log.info("Force recalculating and saving attrition risk for employee: {}", employeeId);
+        Employee employee = employeeRepository.findById(employeeId).orElse(null);
+        if (employee != null) {
+            toDTO(employee); // This triggers the calculation and sets e.attritionRisk
+            employeeRepository.save(employee); // Persist it to the database
+        }
+    }
+
     @Cacheable(value = "employees", key = "'dept-' + #deptId")
     public List<EmployeeDTO> getByDepartment(Long deptId) {
         log.info("Fetching employees by department: {}", deptId);

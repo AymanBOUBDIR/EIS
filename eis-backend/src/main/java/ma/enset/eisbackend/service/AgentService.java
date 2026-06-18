@@ -424,7 +424,9 @@ public class AgentService {
             }
         }
 
-        double totalRisk = Math.min(attendanceRisk + performanceRisk + salaryRisk, 100.0);
+        double totalRisk = emp.getAttritionRisk() != null 
+            ? emp.getAttritionRisk() 
+            : Math.min(attendanceRisk + performanceRisk + salaryRisk, 100.0);
 
         Map<String, Object> metrics = new java.util.HashMap<>();
         metrics.put("attendanceRate", attendanceRate);

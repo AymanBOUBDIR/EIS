@@ -24,6 +24,7 @@ public class PerformanceService {
 
     private final PerformanceRepository performanceRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeeService employeeService;
 
     public List<PerformanceDTO> getEmployeePerformance(Long empId) {
         log.info("Fetching performance for employee: {}", empId);
@@ -32,7 +33,7 @@ public class PerformanceService {
                 .collect(Collectors.toList());
     }
 
-    @CacheEvict(value = "employeePerformance", allEntries = true)
+    @CacheEvict(value = {"employeePerformance", "employees", "employee"}, allEntries = true)
     public PerformanceDTO createPerformance(PerformanceDTO dto) {
         log.info("Creating performance review for employee: {}", dto.getEmpId());
 
@@ -55,10 +56,19 @@ public class PerformanceService {
                 .build();
 
         Performance saved = performanceRepository.save(performance);
-        return toDTO(saved);
+        PerformanceDTO result = toDTO(saved);
+
+        // Recalculate employee risk and save it to database
+        try {
+            employeeService.updateEmployeeAttritionRisk(dto.getEmpId());
+        } catch (Exception e) {
+            log.error("Failed to update employee attrition risk after performance creation: {}", e.getMessage());
+        }
+
+        return result;
     }
 
-    @CacheEvict(value = "employeePerformance", allEntries = true)
+    @CacheEvict(value = {"employeePerformance", "employees", "employee"}, allEntries = true)
     public PerformanceDTO updatePerformance(Long id, PerformanceDTO dto) {
         log.info("Updating performance: {}", id);
 
@@ -70,7 +80,16 @@ public class PerformanceService {
         if (dto.getStatus() != null) performance.setStatus(dto.getStatus());
 
         Performance updated = performanceRepository.save(performance);
-        return toDTO(updated);
+        PerformanceDTO result = toDTO(updated);
+
+        // Recalculate employee risk and save it to database
+        try {
+            employeeService.updateEmployeeAttritionRisk(updated.getEmployee().getId());
+        } catch (Exception e) {
+            log.error("Failed to update employee attrition risk after performance update: {}", e.getMessage());
+        }
+
+        return result;
     }
 
     private PerformanceDTO toDTO(Performance performance) {

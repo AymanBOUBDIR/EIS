@@ -27,6 +27,7 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final EmployeeRepository employeeRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final EmployeeService employeeService;
 
     public List<AttendanceDTO> getEmployeeAttendance(Long empId) {
         log.info("Fetching attendance for employee: {}", empId);
@@ -42,7 +43,7 @@ public class AttendanceService {
                 .collect(Collectors.toList());
     }
 
-    @CacheEvict(value = "employeeAttendance", allEntries = true)
+    @CacheEvict(value = {"employeeAttendance", "employees", "employee"}, allEntries = true)
     public AttendanceDTO recordAttendance(AttendanceDTO dto) {
         log.info("Recording attendance for employee: {}", dto.getEmpId());
 
@@ -68,6 +69,13 @@ public class AttendanceService {
             messagingTemplate.convertAndSend("/topic/attendance", savedDto);
         } catch (Exception e) {
             log.error("Failed to broadcast attendance check-in via WebSocket: {}", e.getMessage());
+        }
+
+        // Recalculate employee risk and save it to database
+        try {
+            employeeService.updateEmployeeAttritionRisk(dto.getEmpId());
+        } catch (Exception e) {
+            log.error("Failed to update employee attrition risk after attendance update: {}", e.getMessage());
         }
 
         return savedDto;
